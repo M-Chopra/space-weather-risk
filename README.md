@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🛸 Space Weather Prediction & Satellite Disruption Risk Analysis
 
 <div align="center">
@@ -263,3 +264,7 @@ Stack: Python · Pandas · NumPy · Scikit-learn · XGBoost · TensorFlow · Str
 <div align="center">
 Made with ☀ and machine learning &nbsp;|&nbsp; Data: NOAA · NASA
 </div>
+=======
+# space-weather-risk
+Space weather risks
+>>>>>>> f177a71db10e70fe87c5646377b6649dd21cb3df
