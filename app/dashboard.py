@@ -30,7 +30,6 @@ from utils.alert_system    import generate_alerts, overall_severity, risk_score
 from utils.report_generator import generate_csv_report, generate_txt_report
 from models.trainer        import train_all_models, load_best_model
 from models.lstm_forecaster import forecast_next_48h
-from utils.satellite_risk_engine import satellite_failure_probability
 logging.basicConfig(level=logging.WARNING)
 from api.live_space_weather import (
     get_live_kp,
@@ -43,7 +42,18 @@ from ai_insights.insight_generator import generate_ai_insight
 from forecasting.simple_forecast import forecast_next_48_hours
 
 from maps.global_risk_map import create_global_risk_map
-
+from tracking.satellite_tracker import create_satellite_tracking_map
+from visuals.earth_sun_cme import create_earth_sun_cme_visual
+from analytics.ml_analytics import (
+    create_model_leaderboard,
+    create_residual_plot,
+    create_prediction_distribution,
+    create_confusion_matrix_from_severity
+)
+from replay.historical_storms import (
+    HISTORICAL_EVENTS,
+    create_historical_replay_chart
+)
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE CONFIG
 # ══════════════════════════════════════════════════════════════════════════════
@@ -348,14 +358,22 @@ comp_risk = risk_score(
 
 # ── NOAA live fetch ────────────────────────────────────────────────────────────
 live_df = None
+
 if fetch_live:
-    with st.spinner("📡 Connecting to NOAA SWPC…"):
-        live_df = fetch_live_noaa_data()
-    if live_df is not None:
-        current_metrics["kp_index"] = float(live_df["kp_index"].iloc[-1])
-        st.success(f"✅ Live Kp: {current_metrics['kp_index']:.1f}")
-    else:
-        st.warning("⚠ NOAA unreachable — using simulated data.")
+    with st.spinner("🛰 Connecting to NOAA SWPC..."):
+
+        live_data = get_live_kp()
+
+        if live_data["success"]:
+
+            current_metrics["kp_index"] = live_data["kp_index"]
+
+            st.success(
+                f"✅ Live NOAA Connected | Kp: {live_data['kp_index']:.1f}"
+            )
+
+        else:
+            st.warning("⚠ NOAA API temporarily unavailable.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  TOP STATUS BAR
@@ -403,7 +421,105 @@ tab_overview, tab_models, tab_forecast, tab_analysis, tab_report, tab_live, tab_
     "🛰 Satellite Risk",
     "🧠 AI Insights"
 ])
+tab_sat_track, tab_cme_3d, tab_ml_advanced, tab_replay = st.tabs([
+    "🛰 Live Satellite Tracking",
+    "🌞 Earth-Sun CME",
+    "📈 Advanced ML Analytics",
+    "🕒 Historical Storm Replay"
+])
+with tab_sat_track:
+    st.markdown('<div class="section-header">🛰 Live Satellite Tracking</div>', unsafe_allow_html=True)
 
+    fig_sat, iss_df = create_satellite_tracking_map(
+        kp_index=float(latest["kp_index"]),
+        sat_risk=float(latest["satellite_disruption_risk"])
+    )
+
+    st.plotly_chart(fig_sat, use_container_width=True)
+
+    st.markdown("### Current ISS Position")
+    st.dataframe(iss_df, use_container_width=True)
+
+    st.info(
+        "This module tracks the ISS live and overlays high-risk satellite disruption zones "
+        "based on geomagnetic and GPS interference conditions."
+    )
+
+
+with tab_cme_3d:
+    st.markdown('<div class="section-header">🌞 Earth-Sun CME Visualization</div>', unsafe_allow_html=True)
+
+    fig_cme = create_earth_sun_cme_visual(
+        kp_index=float(latest["kp_index"]),
+        solar_wind_speed=float(latest["solar_wind_speed"])
+    )
+
+    st.plotly_chart(fig_cme, use_container_width=True)
+
+    st.warning(
+        "This is a scientific-style CME propagation visualization. "
+        "It represents solar wind particles, CME plasma flow, Earth, Sun, and magnetosphere boundary."
+    )
+
+
+with tab_ml_advanced:
+    st.markdown('<div class="section-header">📈 Advanced ML Analytics</div>', unsafe_allow_html=True)
+
+    if "results" not in st.session_state:
+        st.warning("Train models first from the ML Models tab to unlock full analytics.")
+    else:
+        results = st.session_state["results"]
+
+        leaderboard = create_model_leaderboard(results)
+        st.markdown("### Model Leaderboard")
+        st.dataframe(leaderboard, use_container_width=True)
+
+        best_model_name = leaderboard.iloc[0]["Model"]
+        best_data = results[best_model_name]
+
+        y_true = best_data["y_test"]
+        y_pred = best_data["y_pred"]
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fig_residual = create_residual_plot(y_true, y_pred)
+            st.plotly_chart(fig_residual, use_container_width=True)
+
+        with col2:
+            fig_dist = create_prediction_distribution(y_true, y_pred)
+            st.plotly_chart(fig_dist, use_container_width=True)
+
+    st.markdown("### Severity Confusion Matrix")
+    fig_cm, report = create_confusion_matrix_from_severity(raw_df)
+    st.plotly_chart(fig_cm, use_container_width=True)
+
+    with st.expander("View Classification Report"):
+        st.code(report)
+
+
+with tab_replay:
+    st.markdown('<div class="section-header">🕒 Historical Storm Replay</div>', unsafe_allow_html=True)
+
+    selected_event = st.selectbox(
+        "Select Historical Solar Storm Event",
+        list(HISTORICAL_EVENTS.keys())
+    )
+
+    fig_replay, replay_df, event_info = create_historical_replay_chart(selected_event)
+
+    st.plotly_chart(fig_replay, use_container_width=True)
+
+    st.markdown("### Event Summary")
+    st.info(event_info["description"])
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Peak Kp Index", event_info["peak_kp"])
+    c2.metric("Satellite Risk", f"{event_info['satellite_risk']}%")
+    c3.metric("GPS Risk", f"{event_info['gps_risk']}%")
+
+    st.markdown("### Replay Data")
+    st.dataframe(replay_df, use_container_width=True)
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 1 — OVERVIEW
 # ─────────────────────────────────────────────────────────────────────────────
@@ -889,23 +1005,23 @@ with tab_map:
 
 with tab_satellite:
     st.subheader("🛰 Satellite Failure Probability Engine")
+    score = (
+    float(latest["kp_index"]) * 6 +
+    float(latest["solar_wind_speed"]) / 20 +
+    float(latest["gps_blackout_prob"]) * 0.5 +
+    float(latest["satellite_disruption_risk"]) * 0.5
+)
 
-    score, level = satellite_failure_probability(
-        kp_index=float(latest["kp_index"]),
-        solar_wind_speed=float(latest["solar_wind_speed"]),
-        gps_risk=float(latest["gps_blackout_prob"]),
-        sat_risk=float(latest["satellite_disruption_risk"])
-    )
+score = min(score, 100)
 
-    st.metric("Satellite Failure Probability", f"{score}%")
-    st.metric("Risk Level", level)
-
-    if level == "Extreme":
-        st.error("Extreme satellite disruption risk detected.")
-    elif level == "High":
-        st.warning("High satellite disruption risk detected.")
-    else:
-        st.success("Satellite systems are currently within acceptable risk range.")
+if score >= 80:
+    level = "Extreme"
+elif score >= 60:
+    level = "High"
+elif score >= 40:
+    level = "Moderate"
+else:
+    level = "Low"
 
 
 with tab_insights:
