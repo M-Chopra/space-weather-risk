@@ -30,8 +30,19 @@ from utils.alert_system    import generate_alerts, overall_severity, risk_score
 from utils.report_generator import generate_csv_report, generate_txt_report
 from models.trainer        import train_all_models, load_best_model
 from models.lstm_forecaster import forecast_next_48h
-
+from utils.satellite_risk_engine import satellite_failure_probability
 logging.basicConfig(level=logging.WARNING)
+from api.live_space_weather import (
+    get_live_kp,
+    get_solar_wind,
+    get_noaa_alerts
+)
+
+from ai_insights.insight_generator import generate_ai_insight
+
+from forecasting.simple_forecast import forecast_next_48_hours
+
+from maps.global_risk_map import create_global_risk_map
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE CONFIG
@@ -380,12 +391,17 @@ st.markdown("<br>", unsafe_allow_html=True)
 #  TABS
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_overview, tab_models, tab_forecast, tab_analysis, tab_report = st.tabs([
-    "📊  Overview",
-    "🤖  ML Models",
-    "🔭  Forecast",
-    "🔬  Deep Analysis",
-    "📄  Report",
+tab_overview, tab_models, tab_forecast, tab_analysis, tab_report, tab_live, tab_forecast_v2, tab_map, tab_satellite, tab_insights = st.tabs([
+    "📊 Overview",
+    "🤖 ML Models",
+    "🔭 Forecast",
+    "🔬 Deep Analysis",
+    "📄 Report",
+    "📡 Live NOAA",
+    "🔮 48H Forecast",
+    "🌍 Global Risk Map",
+    "🛰 Satellite Risk",
+    "🧠 AI Insights"
 ])
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -830,7 +846,80 @@ with tab_report:
                        file_name="space_weather_full_dataset.csv",
                        mime="text/csv", use_container_width=False)
 
+with tab_live:
+    st.subheader("📡 Live NOAA Space Weather Feed")
 
+    live_kp = get_live_kp()
+    wind = get_solar_wind()
+    alerts = get_noaa_alerts()
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Live Kp Index", live_kp["kp_index"])
+    c2.metric("Solar Wind Speed", f"{wind['speed']} km/s")
+    c3.metric("Solar Wind Density", wind["density"])
+
+    st.markdown("### NOAA Alerts")
+    if alerts:
+        for alert in alerts:
+            st.warning(alert.get("message", "NOAA alert received"))
+    else:
+        st.success("No live NOAA alerts found.")
+
+
+with tab_forecast_v2:
+    st.subheader("🔮 Next 48-Hour Forecast")
+
+    forecast_df = forecast_next_48_hours(raw_df)
+
+    st.line_chart(
+        forecast_df.set_index("timestamp")[
+            ["predicted_kp_index", "predicted_satellite_risk", "predicted_gps_risk"]
+        ]
+    )
+
+    st.dataframe(forecast_df.tail(10), use_container_width=True)
+
+
+with tab_map:
+    st.subheader("🌍 Global Satellite & GPS Risk Map")
+
+    fig_map = create_global_risk_map()
+    st.plotly_chart(fig_map, use_container_width=True)
+
+
+with tab_satellite:
+    st.subheader("🛰 Satellite Failure Probability Engine")
+
+    score, level = satellite_failure_probability(
+        kp_index=float(latest["kp_index"]),
+        solar_wind_speed=float(latest["solar_wind_speed"]),
+        gps_risk=float(latest["gps_blackout_prob"]),
+        sat_risk=float(latest["satellite_disruption_risk"])
+    )
+
+    st.metric("Satellite Failure Probability", f"{score}%")
+    st.metric("Risk Level", level)
+
+    if level == "Extreme":
+        st.error("Extreme satellite disruption risk detected.")
+    elif level == "High":
+        st.warning("High satellite disruption risk detected.")
+    else:
+        st.success("Satellite systems are currently within acceptable risk range.")
+
+
+with tab_insights:
+    st.subheader("🧠 AI-Generated Storm Insight")
+
+    insight = generate_ai_insight(
+        kp_index=float(latest["kp_index"]),
+        solar_wind_speed=float(latest["solar_wind_speed"]),
+        gps_risk=float(latest["gps_blackout_prob"]),
+        sat_risk=float(latest["satellite_disruption_risk"]),
+        severity=severity
+    )
+
+    st.info(insight)
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.markdown("""
