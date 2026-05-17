@@ -30,6 +30,10 @@ from utils.alert_system    import generate_alerts, overall_severity, risk_score
 from utils.report_generator import generate_csv_report, generate_txt_report
 from models.trainer        import train_all_models, load_best_model
 from models.lstm_forecaster import forecast_next_48h
+from visuals.realtime_3d_globe import create_realtime_3d_globe
+from maps.geomagnetic_heatmap import create_geomagnetic_heatmap
+from analytics.mission_risk import calculate_mission_risk
+from analytics.aurora_prediction import generate_aurora_prediction
 logging.basicConfig(level=logging.WARNING)
 from api.live_space_weather import (
     get_live_kp,
@@ -409,24 +413,139 @@ st.markdown("<br>", unsafe_allow_html=True)
 #  TABS
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_overview, tab_models, tab_forecast, tab_analysis, tab_report, tab_live, tab_forecast_v2, tab_map, tab_satellite, tab_insights = st.tabs([
+(
+    tab_overview,
+    tab_models,
+    tab_forecast,
+    tab_analysis,
+    tab_report
+) = st.tabs([
+
     "📊 Overview",
     "🤖 ML Models",
     "🔭 Forecast",
     "🔬 Deep Analysis",
-    "📄 Report",
-    "📡 Live NOAA",
-    "🔮 48H Forecast",
-    "🌍 Global Risk Map",
-    "🛰 Satellite Risk",
-    "🧠 AI Insights"
+    "📄 Report"
 ])
-tab_sat_track, tab_cme_3d, tab_ml_advanced, tab_replay = st.tabs([
-    "🛰 Live Satellite Tracking",
-    "🌞 Earth-Sun CME",
-    "📈 Advanced ML Analytics",
-    "🕒 Historical Storm Replay"
+st.markdown("## 🚀 Advanced Space Intelligence")
+(
+    tab_globe,
+    tab_heatmap,
+    tab_sat_track,
+    tab_cme,
+    tab_ml_advanced,
+    tab_replay
+) = st.tabs([
+
+    "🌍 3D Globe",
+    "🌐 Heatmap",
+    "🛰 Tracking",
+    "🌞 CME",
+    "📈 ML Analytics",
+    "🕒 Storm Replay"
 ])
+st.markdown("## 🤖 AI Prediction Systems")
+(
+    tab_mission,
+    tab_aurora
+) = st.tabs([
+
+    "🚀 Mission Risk",
+    "🌌 Aurora AI"
+])
+with tab_aurora:
+
+    st.markdown(
+        '<div class="section-header">🌌 AURORAL PREDICTION SYSTEM</div>',
+        unsafe_allow_html=True
+    )
+
+    aurora_df, aurora_fig = generate_aurora_prediction(
+
+        kp_index=float(latest["kp_index"])
+    )
+
+    st.plotly_chart(
+        aurora_fig,
+        use_container_width=True
+    )
+
+    st.dataframe(
+        aurora_df,
+        use_container_width=True
+    )
+
+    best_region = aurora_df.sort_values(
+        "Visibility",
+        ascending=False
+    ).iloc[0]["Region"]
+
+    st.success(
+        f"Best current aurora visibility region: {best_region}"
+    )
+with tab_mission:
+
+    st.markdown(
+        '<div class="section-header">🚀 SPACE MISSION RISK ANALYSIS</div>',
+        unsafe_allow_html=True
+    )
+
+    mission_score, mission_level, mission_color, mission_df = calculate_mission_risk(
+
+        kp_index=float(latest["kp_index"]),
+        solar_wind=float(latest["solar_wind_speed"]),
+        gps_risk=float(latest["gps_blackout_prob"]),
+        sat_risk=float(latest["satellite_disruption_risk"])
+    )
+
+    st.metric(
+        "Mission Risk Score",
+        f"{mission_score:.1f}%"
+    )
+
+    if mission_level == "EXTREME":
+        st.error("🚨 Severe mission instability possible.")
+
+    elif mission_level == "HIGH":
+        st.warning("⚠ Elevated mission risk detected.")
+
+    else:
+        st.success("✅ Mission environment currently acceptable.")
+
+    st.dataframe(
+        mission_df,
+        use_container_width=True
+    )
+with tab_globe:
+
+    st.markdown(
+        '<div class="section-header">🌍 REAL-TIME 3D SPACE GLOBE</div>',
+        unsafe_allow_html=True
+    )
+
+    fig_globe = create_realtime_3d_globe()
+
+    st.plotly_chart(fig_globe, use_container_width=True)
+
+    st.info(
+        "This visualization represents Earth, satellite systems, "
+        "auroral activity, and orbital monitoring zones."
+    )
+with tab_heatmap:
+
+    st.markdown(
+        '<div class="section-header">🌐 LIVE GEOMAGNETIC HEATMAP</div>',
+        unsafe_allow_html=True
+    )
+
+    fig_heatmap = create_geomagnetic_heatmap()
+
+    st.plotly_chart(fig_heatmap, use_container_width=True)
+
+    st.info(
+        "Global geomagnetic disturbance intensity visualization "
+        "based on simulated solar storm propagation."
+    )
 with tab_sat_track:
     st.markdown('<div class="section-header">🛰 Live Satellite Tracking</div>', unsafe_allow_html=True)
 
@@ -446,7 +565,7 @@ with tab_sat_track:
     )
 
 
-with tab_cme_3d:
+with tab_cme:
     st.markdown('<div class="section-header">🌞 Earth-Sun CME Visualization</div>', unsafe_allow_html=True)
 
     fig_cme = create_earth_sun_cme_visual(
