@@ -434,7 +434,8 @@ st.markdown("## 🚀 Advanced Space Intelligence")
     tab_sat_track,
     tab_cme,
     tab_ml_advanced,
-    tab_replay
+    tab_replay,
+    tab_live
 ) = st.tabs([
 
     "🌍 3D Globe",
@@ -442,7 +443,8 @@ st.markdown("## 🚀 Advanced Space Intelligence")
     "🛰 Tracking",
     "🌞 CME",
     "📈 ML Analytics",
-    "🕒 Storm Replay"
+    "🕒 Storm Replay",
+    "📡 Live NOAA"
 ])
 st.markdown("## 🤖 AI Prediction Systems")
 (
