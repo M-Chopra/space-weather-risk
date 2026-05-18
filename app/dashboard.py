@@ -437,7 +437,8 @@ st.markdown("## 🚀 Advanced Space Intelligence")
     tab_cme,
     tab_ml_advanced,
     tab_replay,
-    tab_live
+    tab_live,
+    tab_insights
 ) = st.tabs([
 
     "🛰 48H Forecast",
@@ -447,7 +448,8 @@ st.markdown("## 🚀 Advanced Space Intelligence")
     "🌞 CME",
     "📈 ML Analytics",
     "🕒 Storm Replay",
-    "📡 Live NOAA"
+    "📡 Live NOAA",
+    "🧠 AI Insights"
 ])
 st.markdown("## 🤖 AI Prediction Systems")
 (
@@ -1120,32 +1122,10 @@ with tab_forecast_v2:
     st.dataframe(forecast_df.tail(10), use_container_width=True)
 
 
-with tab_map:
-    st.subheader("🌍 Global Satellite & GPS Risk Map")
-
-    fig_map = create_global_risk_map()
-    st.plotly_chart(fig_map, use_container_width=True)
 
 
-with tab_satellite:
-    st.subheader("🛰 Satellite Failure Probability Engine")
-    score = (
-    float(latest["kp_index"]) * 6 +
-    float(latest["solar_wind_speed"]) / 20 +
-    float(latest["gps_blackout_prob"]) * 0.5 +
-    float(latest["satellite_disruption_risk"]) * 0.5
-)
 
-score = min(score, 100)
 
-if score >= 80:
-    level = "Extreme"
-elif score >= 60:
-    level = "High"
-elif score >= 40:
-    level = "Moderate"
-else:
-    level = "Low"
 
 
 with tab_insights:
