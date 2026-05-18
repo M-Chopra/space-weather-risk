@@ -428,7 +428,9 @@ st.markdown("<br>", unsafe_allow_html=True)
     "📄 Report"
 ])
 st.markdown("## 🚀 Advanced Space Intelligence")
+
 (
+    tab_forecast_v2,
     tab_globe,
     tab_heatmap,
     tab_sat_track,
@@ -438,6 +440,7 @@ st.markdown("## 🚀 Advanced Space Intelligence")
     tab_live
 ) = st.tabs([
 
+    "🛰 48H Forecast",
     "🌍 3D Globe",
     "🌐 Heatmap",
     "🛰 Tracking",
@@ -836,7 +839,7 @@ with tab_models:
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 3 — FORECAST
 # ─────────────────────────────────────────────────────────────────────────────
-with tab_forecast:
+with tab_forecast_v2:
     st.markdown('<div class="section-header">🔭 Next 48-Hour Space Weather Forecast</div>', unsafe_allow_html=True)
 
     col_f1, col_f2 = st.columns([2, 1])
